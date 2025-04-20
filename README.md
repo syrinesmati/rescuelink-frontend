@@ -11,7 +11,8 @@ RescueLink is a real-time, multi-role emergency management platform that connect
 - 🎨 **Tailwind CSS** – Utility-first CSS framework  
 - 🧩 **shadcn/ui** – Accessible and elegant UI components  
 - 🔄 **React Router DOM** – Declarative routing  
- 
+- 🔌 (Optional) **GraphQL / REST** for API communication  
+- 📡 **WebSockets / SSE** for real-time updates  
 
 ---
 
@@ -20,7 +21,7 @@ RescueLink is a real-time, multi-role emergency management platform that connect
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/syrinesmati/RescueLink.git
+git clone https://github.com/syrinesmati/rescuelink-frontend.git
 cd rescuelink-frontend
 ```
 
@@ -28,14 +29,17 @@ cd rescuelink-frontend
 
 ```bash
 npm install
+# or
+yarn
+```
 
-
-
-### 4. Start the Development Server
+### 3. Start the Development Server
 
 ```bash
 npm run dev
-
+# or
+yarn dev
+```
 
 Navigate to `http://localhost:8080` to view the app.
 
@@ -49,9 +53,9 @@ RescueLink consists of 3 main portals:
 - 🚒 **Responder Portal** – Receive mission info, submit reports
 - 🧭 **Coordinator Portal** – Oversee and manage response efforts
 
+Routing and UI are dynamically adjusted based on the logged-in role.
 
 ---
-
 
 
 > Built with ❤️ by the RescueLink team.
