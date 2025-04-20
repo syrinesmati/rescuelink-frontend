@@ -21,7 +21,7 @@ RescueLink is a real-time, multi-role emergency management platform that connect
 
 ```bash
 git clone https://github.com/syrinesmati/RescueLink.git
-cd RescueLink
+cd rescuelink-frontend
 ```
 
 ### 2. Install Dependencies
@@ -35,9 +35,7 @@ npm install
 
 ```bash
 npm run dev
-# or
-yarn dev
-```
+
 
 Navigate to `http://localhost:8080` to view the app.
 
