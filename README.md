@@ -11,8 +11,6 @@ RescueLink is a real-time, multi-role emergency management platform that connect
 - 🎨 **Tailwind CSS** – Utility-first CSS framework  
 - 🧩 **shadcn/ui** – Accessible and elegant UI components  
 - 🔄 **React Router DOM** – Declarative routing  
-- 🔌 (Optional) **GraphQL / REST** for API communication  
-- 📡 **WebSockets / SSE** for real-time updates  
 
 ---
 
