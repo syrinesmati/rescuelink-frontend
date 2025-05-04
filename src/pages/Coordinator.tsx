@@ -144,271 +144,247 @@ const CoordinatorPage = () => {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="border-red-600 dark:border-red-400 border-l-4">
-            <CardHeader>
-              <CardTitle className="text-lg text-red-700 dark:text-red-400">Active Emergencies</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <Bell className="w-5 h-5 text-red-600 dark:text-red-500" />
-                <p className="text-3xl font-bold text-red-700 dark:text-red-400">{activeCount}</p>
+          {["Active Emergencies", "Available Teams", "In Progress", "Resolved Today"].map((title, index) => (
+            <Card key={title} className="border border-red-200 dark:border-red-900/40 shadow-md rounded-2xl overflow-hidden transition-all duration-200 hover:shadow-lg">
+              <div className="border-l-4 border-red-600 dark:border-red-400 h-full">
+                <CardHeader>
+                  <CardTitle className="text-lg text-red-700 dark:text-red-400">{title}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-2">
+                    <Bell className="w-5 h-5 text-red-600 dark:text-red-500" />
+                    <p className="text-3xl font-bold text-red-700 dark:text-red-400">{activeCount}</p>
+                  </div>
+                </CardContent>
               </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="border-red-600 dark:border-red-400 border-l-4">
-            <CardHeader>
-              <CardTitle className="text-lg text-red-700 dark:text-red-400">Available Teams</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-red-600 dark:text-red-500" />
-                <p className="text-3xl font-bold text-red-700 dark:text-red-400">{availableTeams}</p>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="border-red-600 dark:border-red-400 border-l-4">
-            <CardHeader>
-              <CardTitle className="text-lg text-red-700 dark:text-red-400">In Progress</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <Clock className="w-5 h-5 text-red-600 dark:text-red-500" />
-                <p className="text-3xl font-bold text-red-700 dark:text-red-400">{inProgressCount}</p>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="border-red-600 dark:border-red-400 border-l-4">
-            <CardHeader>
-              <CardTitle className="text-lg text-red-700 dark:text-red-400">Resolved Today</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <Check className="w-5 h-5 text-red-600 dark:text-red-500" />
-                <p className="text-3xl font-bold text-red-700 dark:text-red-400">{resolvedToday}</p>
-              </div>
-            </CardContent>
-          </Card>
+            </Card>
+          ))}
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           <div className="lg:col-span-2">
-            <Card className="border-red-600 dark:border-red-400 border-l-4">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-red-700 dark:text-red-400">Emergency Queue</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-[140px]">
-                      <Filter className="w-4 h-4 mr-2" />
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all_statuses">All Statuses</SelectItem>
-                      <SelectItem value="Received">Received</SelectItem>
-                      <SelectItem value="Dispatched">Dispatched</SelectItem>
-                      <SelectItem value="In Progress">In Progress</SelectItem>
-                      <SelectItem value="Resolved">Resolved</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  
-                  <Select value={urgencyFilter} onValueChange={setUrgencyFilter}>
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue placeholder="Urgency" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all_urgencies">All Urgencies</SelectItem>
-                      <SelectItem value="Low">Low</SelectItem>
-                      <SelectItem value="Medium">Medium</SelectItem>
-                      <SelectItem value="High">High</SelectItem>
-                      <SelectItem value="Critical">Critical</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  
-                  <Input
-                    placeholder="Search..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-[180px]"
-                  />
-                </div>
-              </CardHeader>
-              <CardContent>
-                {filteredEmergencies.length === 0 ? (
-                  <p className="text-gray-500 dark:text-gray-400">No emergencies match your filters</p>
-                ) : (
-                  <div className="space-y-4">
-                    {filteredEmergencies.map((emergency) => (
-                      <Card key={emergency.id} className={`border-l-4 ${
-                        emergency.urgency === "Critical" ? "border-red-600 dark:border-red-400" :
-                        emergency.urgency === "High" ? "border-orange-600 dark:border-orange-400" :
-                        emergency.urgency === "Medium" ? "border-yellow-600 dark:border-yellow-400" :
-                        "border-green-600 dark:border-green-400"
-                      }`}>
-                        <CardContent className="p-4">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h4 className="font-semibold text-red-700 dark:text-red-400">
-                                Emergency #{emergency.id}
-                                <span className={`ml-2 text-xs px-2 py-1 rounded-full ${
-                                  emergency.status === "Received" ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" :
-                                  emergency.status === "Dispatched" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" :
-                                  emergency.status === "In Progress" ? "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200" :
-                                  "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                                }`}>
-                                  {emergency.status}
-                                </span>
-                                <span className={`ml-2 text-xs px-2 py-1 rounded-full ${
-                                  emergency.urgency === "Critical" ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" :
-                                  emergency.urgency === "High" ? "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200" :
-                                  emergency.urgency === "Medium" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" :
-                                  "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                                }`}>
-                                  {emergency.urgency}
-                                </span>
-                              </h4>
-                              <p className="text-gray-700 dark:text-gray-300 mt-1">{emergency.description}</p>
-                              <p className="text-sm flex items-center gap-1 mt-1 text-gray-600 dark:text-gray-400">
-                                <MapPin className="w-4 h-4" /> {emergency.location}
-                              </p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                Submitted: {emergency.submittedAt.toLocaleString()}
-                              </p>
-                            </div>
-                            <div className="flex gap-2">
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                onClick={() => setSelectedEmergency(emergency)}
-                              >
-                                <MessageCircle className="w-4 h-4 mr-1" /> Chat
-                              </Button>
-                              
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <Button size="sm" variant="outline">
-                                    <UserPlus className="w-4 h-4 mr-1" /> Assign
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-56">
-                                  <div className="space-y-2">
-                                    <h4 className="font-medium">Assign Responders</h4>
-                                    {availableResponders.length === 0 ? (
-                                      <p className="text-sm text-gray-500">No available responders</p>
-                                    ) : (
-                                      availableResponders.map(responder => (
-                                        <div key={responder.id} className="flex justify-between items-center">
-                                          <span>{responder.name}</span>
-                                          <Button 
-                                            size="sm" 
-                                            variant="outline"
-                                            onClick={() => assignResponder(emergency.id, responder.id)}
-                                          >
-                                            Assign
-                                          </Button>
-                                        </div>
-                                      ))
-                                    )}
-                                  </div>
-                                </PopoverContent>
-                              </Popover>
-                            </div>
-                          </div>
-                          
-                          {emergency.assignedTo && emergency.assignedTo.length > 0 && (
-                            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Assigned Teams:</p>
-                              <div className="flex flex-wrap gap-2 mt-1">
-                                {emergency.assignedTo.map(id => {
-                                  const responder = responders.find(r => r.id === id);
-                                  return responder ? (
-                                    <span key={id} className="text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 px-2 py-1 rounded-full">
-                                      {responder.name} ({responder.status})
-                                    </span>
-                                  ) : null;
-                                })}
-                              </div>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    ))}
+            <Card className="border border-red-200 dark:border-red-900/40 shadow-md rounded-2xl overflow-hidden transition-all duration-200 hover:shadow-lg">
+              <div className="border-l-4 border-red-600 dark:border-red-400 h-full">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-red-700 dark:text-red-400">Emergency Queue</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-[140px]">
+                        <Filter className="w-4 h-4 mr-2" />
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all_statuses">All Statuses</SelectItem>
+                        <SelectItem value="Received">Received</SelectItem>
+                        <SelectItem value="Dispatched">Dispatched</SelectItem>
+                        <SelectItem value="In Progress">In Progress</SelectItem>
+                        <SelectItem value="Resolved">Resolved</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    
+                    <Select value={urgencyFilter} onValueChange={setUrgencyFilter}>
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue placeholder="Urgency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all_urgencies">All Urgencies</SelectItem>
+                        <SelectItem value="Low">Low</SelectItem>
+                        <SelectItem value="Medium">Medium</SelectItem>
+                        <SelectItem value="High">High</SelectItem>
+                        <SelectItem value="Critical">Critical</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    
+                    <Input
+                      placeholder="Search..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-[180px]"
+                    />
                   </div>
-                )}
-              </CardContent>
+                </CardHeader>
+                <CardContent>
+                  {filteredEmergencies.length === 0 ? (
+                    <p className="text-gray-500 dark:text-gray-400">No emergencies match your filters</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {filteredEmergencies.map((emergency) => (
+                        <Card key={emergency.id} className="border border-red-200 dark:border-red-900/40 shadow-md rounded-2xl overflow-hidden transition-all duration-200 hover:shadow-lg">
+                          <div className={`border-l-4 ${
+                            emergency.urgency === "Critical" ? "border-red-600 dark:border-red-400" :
+                            emergency.urgency === "High" ? "border-orange-600 dark:border-orange-400" :
+                            emergency.urgency === "Medium" ? "border-yellow-600 dark:border-yellow-400" :
+                            "border-green-600 dark:border-green-400"
+                          } h-full`}>
+                            <CardContent className="p-4">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <h4 className="font-semibold text-red-700 dark:text-red-400">
+                                    Emergency #{emergency.id}
+                                    <span className={`ml-2 text-xs px-2 py-1 rounded-full ${
+                                      emergency.status === "Received" ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" :
+                                      emergency.status === "Dispatched" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" :
+                                      emergency.status === "In Progress" ? "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200" :
+                                      "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                                    }`}>
+                                      {emergency.status}
+                                    </span>
+                                    <span className={`ml-2 text-xs px-2 py-1 rounded-full ${
+                                      emergency.urgency === "Critical" ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" :
+                                      emergency.urgency === "High" ? "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200" :
+                                      emergency.urgency === "Medium" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" :
+                                      "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                                    }`}>
+                                      {emergency.urgency}
+                                    </span>
+                                  </h4>
+                                  <p className="text-gray-700 dark:text-gray-300 mt-1">{emergency.description}</p>
+                                  <p className="text-sm flex items-center gap-1 mt-1 text-gray-600 dark:text-gray-400">
+                                    <MapPin className="w-4 h-4" /> {emergency.location}
+                                  </p>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    Submitted: {emergency.submittedAt.toLocaleString()}
+                                  </p>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => setSelectedEmergency(emergency)}
+                                  >
+                                    <MessageCircle className="w-4 h-4 mr-1" /> Chat
+                                  </Button>
+                                  
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <Button size="sm" variant="outline">
+                                        <UserPlus className="w-4 h-4 mr-1" /> Assign
+                                      </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-56">
+                                      <div className="space-y-2">
+                                        <h4 className="font-medium">Assign Responders</h4>
+                                        {availableResponders.length === 0 ? (
+                                          <p className="text-sm text-gray-500">No available responders</p>
+                                        ) : (
+                                          availableResponders.map(responder => (
+                                            <div key={responder.id} className="flex justify-between items-center">
+                                              <span>{responder.name}</span>
+                                              <Button 
+                                                size="sm" 
+                                                variant="outline"
+                                                onClick={() => assignResponder(emergency.id, responder.id)}
+                                              >
+                                                Assign
+                                              </Button>
+                                            </div>
+                                          ))
+                                        )}
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                </div>
+                              </div>
+                              
+                              {emergency.assignedTo && emergency.assignedTo.length > 0 && (
+                                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Assigned Teams:</p>
+                                  <div className="flex flex-wrap gap-2 mt-1">
+                                    {emergency.assignedTo.map(id => {
+                                      const responder = responders.find(r => r.id === id);
+                                      return responder ? (
+                                        <span key={id} className="text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 px-2 py-1 rounded-full">
+                                          {responder.name} ({responder.status})
+                                        </span>
+                                      ) : null;
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                            </CardContent>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </div>
             </Card>
           </div>
           
-          <Card className="border-red-600 dark:border-red-400 border-l-4">
-            <CardHeader>
-              <CardTitle className="text-red-700 dark:text-red-400">Operations Map</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-gray-100 dark:bg-gray-800 rounded-md p-4 mb-4 h-[200px] flex items-center justify-center">
-                <div className="flex flex-col items-center text-gray-500 dark:text-gray-400">
-                  <Map className="w-12 h-12 mb-2" />
-                  <p>Interactive map</p>
-                  <p className="text-xs">(Simulated)</p>
+          <Card className="border border-red-200 dark:border-red-900/40 shadow-md rounded-2xl overflow-hidden transition-all duration-200 hover:shadow-lg">
+            <div className="border-l-4 border-red-600 dark:border-red-400 h-full">
+              <CardHeader>
+                <CardTitle className="text-red-700 dark:text-red-400">Operations Map</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="bg-gray-100 dark:bg-gray-800 rounded-md p-4 mb-4 h-[200px] flex items-center justify-center">
+                  <div className="flex flex-col items-center text-gray-500 dark:text-gray-400">
+                    <Map className="w-12 h-12 mb-2" />
+                    <p>Interactive map</p>
+                    <p className="text-xs">(Simulated)</p>
+                  </div>
                 </div>
-              </div>
-              
-              <h4 className="font-medium text-red-700 dark:text-red-400 mb-2">Activity Timeline</h4>
-              <ChartContainer config={{
-                emergencies: {
-                  label: "Emergencies",
-                  theme: { light: "#ef4444", dark: "#f87171" },
-                }
-              }} className="h-[200px]">
-                <AreaChart
-                  data={timelineData}
-                  margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Area
-                    type="monotone"
-                    dataKey="emergencies"
-                    stroke="var(--color-emergencies)"
-                    fill="var(--color-emergencies)"
-                    fillOpacity={0.3}
-                  />
-                </AreaChart>
-              </ChartContainer>
-            </CardContent>
+                
+                <h4 className="font-medium text-red-700 dark:text-red-400 mb-2">Activity Timeline</h4>
+                <ChartContainer config={{
+                  emergencies: {
+                    label: "Emergencies",
+                    theme: { light: "#ef4444", dark: "#f87171" },
+                  }
+                }} className="h-[200px]">
+                  <AreaChart
+                    data={timelineData}
+                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Area
+                      type="monotone"
+                      dataKey="emergencies"
+                      stroke="var(--color-emergencies)"
+                      fill="var(--color-emergencies)"
+                      fillOpacity={0.3}
+                    />
+                  </AreaChart>
+                </ChartContainer>
+              </CardContent>
+            </div>
           </Card>
         </div>
         
         {selectedEmergency && (
-          <Card className="border-red-600 dark:border-red-400 border-l-4 mb-8">
-            <CardHeader>
-              <CardTitle className="text-red-700 dark:text-red-400">
-                Communication - Emergency #{selectedEmergency.id}
-              </CardTitle>
-              <CardDescription>
-                Chat with responders assigned to this emergency
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[200px] bg-gray-50 dark:bg-gray-800 rounded-md p-4 mb-4 overflow-y-auto">
-                <p className="text-center text-gray-500 dark:text-gray-400">
-                  Chat messages will appear here
-                </p>
-                {/* In a real application, messages would be displayed here */}
-              </div>
-              
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Type your message..."
-                  value={chatMessage}
-                  onChange={(e) => setChatMessage(e.target.value)}
-                  className="flex-1"
-                />
-                <Button onClick={handleSendMessage}>Send</Button>
-              </div>
-            </CardContent>
+          <Card className="border border-red-200 dark:border-red-900/40 shadow-md rounded-2xl overflow-hidden transition-all duration-200 hover:shadow-lg mb-8">
+            <div className="border-l-4 border-red-600 dark:border-red-400 h-full">
+              <CardHeader>
+                <CardTitle className="text-red-700 dark:text-red-400">
+                  Communication - Emergency #{selectedEmergency.id}
+                </CardTitle>
+                <CardDescription>
+                  Chat with responders assigned to this emergency
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[200px] bg-gray-50 dark:bg-gray-800 rounded-md p-4 mb-4 overflow-y-auto">
+                  <p className="text-center text-gray-500 dark:text-gray-400">
+                    Chat messages will appear here
+                  </p>
+                  {/* In a real application, messages would be displayed here */}
+                </div>
+                
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Type your message..."
+                    value={chatMessage}
+                    onChange={(e) => setChatMessage(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button onClick={handleSendMessage}>Send</Button>
+                </div>
+              </CardContent>
+            </div>
           </Card>
         )}
       </div>

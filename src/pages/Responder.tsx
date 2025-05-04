@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -182,8 +183,8 @@ const ResponderPage = () => {
   );
 
   return (
-    <section className="min-h-screen bg-gradient-to-b from-slate-50 to-red-50 dark:from-slate-900 dark:to-red-950/30 p-6">
-      <div className="max-w-4xl mx-auto space-y-8">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-red-50 dark:from-slate-900 dark:to-red-950/30 flex items-center justify-center p-6">
+      <div className="max-w-7xl w-full mx-auto space-y-8">
         <div className="text-center space-y-2">
           <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-red-600 to-orange-500 bg-clip-text text-transparent">
             Responder Dashboard
@@ -202,160 +203,166 @@ const ResponderPage = () => {
             ) : (
               <div className="space-y-6">
                 {missions.map((mission) => (
-                  <Card key={mission.id} className="border-red-600 dark:border-red-400 border-l-4">
-                    <CardHeader>
-                      <CardTitle className="text-red-700 dark:text-red-400">
-                        Mission #{mission.id}
-                      </CardTitle>
-                      <CardDescription>{mission.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="mb-2 text-gray-800 dark:text-gray-200 flex items-center gap-1">
-                        <MapPin className="inline-block w-4 h-4 text-red-600 dark:text-red-500" />
-                        <span>{mission.location}</span>
-                      </p>
-                      <p className="text-sm mb-4 text-red-700 dark:text-red-400 font-semibold">
-                        Status: {mission.status}
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          variant={mission.status === "Assigned" ? "destructive" : "outline"}
-                          size="sm"
-                          disabled={mission.status !== "Assigned"}
-                          onClick={() => updateMissionStatus(mission.id, "En Route")}
-                        >
-                          <ArrowRight className="w-4 h-4" /> En Route
-                        </Button>
-                        <Button
-                          variant={mission.status === "En Route" ? "destructive" : "outline"}
-                          size="sm"
-                          disabled={mission.status !== "En Route"}
-                          onClick={() => updateMissionStatus(mission.id, "On Site")}
-                        >
-                          <Clock className="w-4 h-4" /> On Site
-                        </Button>
-                        <Button
-                          variant={mission.status === "On Site" ? "destructive" : "outline"}
-                          size="sm"
-                          disabled={mission.status !== "On Site"}
-                          onClick={() => updateMissionStatus(mission.id, "Completed")}
-                        >
-                          <Check className="w-4 h-4" /> Completed
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelectedMission(mission)}
-                        >
-                          <MessageCircle className="w-4 h-4" /> Chat
-                        </Button>
-                      </div>
-                      <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                        Assigned: {mission.assignedAt.toLocaleString()}
-                      </p>
-                    </CardContent>
+                  <Card key={mission.id} className="border border-red-200 dark:border-red-900/40 shadow-md rounded-2xl overflow-hidden transition-all duration-200 hover:shadow-lg">
+                    <div className="border-l-4 border-red-600 dark:border-red-400 h-full">
+                      <CardHeader>
+                        <CardTitle className="text-red-700 dark:text-red-400">
+                          Mission #{mission.id}
+                        </CardTitle>
+                        <CardDescription>{mission.description}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="mb-2 text-gray-800 dark:text-gray-200 flex items-center gap-1">
+                          <MapPin className="inline-block w-4 h-4 text-red-600 dark:text-red-500" />
+                          <span>{mission.location}</span>
+                        </p>
+                        <p className="text-sm mb-4 text-red-700 dark:text-red-400 font-semibold">
+                          Status: {mission.status}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            variant={mission.status === "Assigned" ? "destructive" : "outline"}
+                            size="sm"
+                            disabled={mission.status !== "Assigned"}
+                            onClick={() => updateMissionStatus(mission.id, "En Route")}
+                          >
+                            <ArrowRight className="w-4 h-4" /> En Route
+                          </Button>
+                          <Button
+                            variant={mission.status === "En Route" ? "destructive" : "outline"}
+                            size="sm"
+                            disabled={mission.status !== "En Route"}
+                            onClick={() => updateMissionStatus(mission.id, "On Site")}
+                          >
+                            <Clock className="w-4 h-4" /> On Site
+                          </Button>
+                          <Button
+                            variant={mission.status === "On Site" ? "destructive" : "outline"}
+                            size="sm"
+                            disabled={mission.status !== "On Site"}
+                            onClick={() => updateMissionStatus(mission.id, "Completed")}
+                          >
+                            <Check className="w-4 h-4" /> Completed
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSelectedMission(mission)}
+                          >
+                            <MessageCircle className="w-4 h-4" /> Chat
+                          </Button>
+                        </div>
+                        <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                          Assigned: {mission.assignedAt.toLocaleString()}
+                        </p>
+                      </CardContent>
+                    </div>
                   </Card>
                 ))}
               </div>
             )}
 
-            <Card className="mt-6 border-red-600 dark:border-red-400 border-l-4">
-              <CardHeader>
-                <CardTitle className="text-red-700 dark:text-red-400">
-                  Location Sharing
-                </CardTitle>
-                <CardDescription>
-                  Share your real-time location with coordinators
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col gap-4">
-                  <Button 
-                    onClick={toggleLocationSharing}
-                    variant={locationSharing ? "destructive" : "default"}
-                  >
-                    <MapPin className="w-4 h-4 mr-2" />
-                    {locationSharing ? "Stop Sharing Location" : "Share My Location"}
-                  </Button>
-                  
-                  {locationError && (
-                    <p className="text-red-500 text-sm">{locationError}</p>
-                  )}
-                  
-                  {currentLocation && locationSharing && (
-                    <div className="text-sm">
-                      <p className="font-medium">Current coordinates:</p>
-                      <p>Latitude: {currentLocation.latitude.toFixed(6)}</p>
-                      <p>Longitude: {currentLocation.longitude.toFixed(6)}</p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Accuracy: ±{currentLocation.accuracy.toFixed(1)} meters
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
+            <Card className="mt-6 border border-red-200 dark:border-red-900/40 shadow-md rounded-2xl overflow-hidden transition-all duration-200 hover:shadow-lg">
+              <div className="border-l-4 border-red-600 dark:border-red-400 h-full">
+                <CardHeader>
+                  <CardTitle className="text-red-700 dark:text-red-400">
+                    Location Sharing
+                  </CardTitle>
+                  <CardDescription>
+                    Share your real-time location with coordinators
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col gap-4">
+                    <Button 
+                      onClick={toggleLocationSharing}
+                      variant={locationSharing ? "destructive" : "default"}
+                    >
+                      <MapPin className="w-4 h-4 mr-2" />
+                      {locationSharing ? "Stop Sharing Location" : "Share My Location"}
+                    </Button>
+                    
+                    {locationError && (
+                      <p className="text-red-500 text-sm">{locationError}</p>
+                    )}
+                    
+                    {currentLocation && locationSharing && (
+                      <div className="text-sm">
+                        <p className="font-medium">Current coordinates:</p>
+                        <p>Latitude: {currentLocation.latitude.toFixed(6)}</p>
+                        <p>Longitude: {currentLocation.longitude.toFixed(6)}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Accuracy: ±{currentLocation.accuracy.toFixed(1)} meters
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </div>
             </Card>
           </div>
 
           {selectedMission && (
-            <Card className="border-red-600 dark:border-red-400 border-l-4">
-              <CardHeader>
-                <CardTitle className="text-red-700 dark:text-red-400">
-                  Chat - Mission #{selectedMission.id}
-                </CardTitle>
-                <CardDescription>
-                  Communicate with coordinators about your mission
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[400px] overflow-y-auto bg-gray-50 dark:bg-gray-800 rounded-md p-4 mb-4">
-                  {filteredMessages.length === 0 ? (
-                    <p className="text-center text-gray-500 dark:text-gray-400">
-                      No messages yet
-                    </p>
-                  ) : (
-                    <div className="space-y-4">
-                      {filteredMessages.map((message) => (
-                        <div
-                          key={message.id}
-                          className={`flex ${
-                            message.sender === "responder" ? "justify-end" : "justify-start"
-                          }`}
-                        >
+            <Card className="border border-red-200 dark:border-red-900/40 shadow-md rounded-2xl overflow-hidden transition-all duration-200 hover:shadow-lg">
+              <div className="border-l-4 border-red-600 dark:border-red-400 h-full">
+                <CardHeader>
+                  <CardTitle className="text-red-700 dark:text-red-400">
+                    Chat - Mission #{selectedMission.id}
+                  </CardTitle>
+                  <CardDescription>
+                    Communicate with coordinators about your mission
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[400px] overflow-y-auto bg-gray-50 dark:bg-gray-800 rounded-md p-4 mb-4">
+                    {filteredMessages.length === 0 ? (
+                      <p className="text-center text-gray-500 dark:text-gray-400">
+                        No messages yet
+                      </p>
+                    ) : (
+                      <div className="space-y-4">
+                        {filteredMessages.map((message) => (
                           <div
-                            className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                              message.sender === "responder"
-                                ? "bg-red-100 dark:bg-red-900 text-red-900 dark:text-red-100"
-                                : "bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100"
+                            key={message.id}
+                            className={`flex ${
+                              message.sender === "responder" ? "justify-end" : "justify-start"
                             }`}
                           >
-                            <p>{message.content}</p>
-                            <p className="text-xs opacity-70 mt-1">
-                              {message.timestamp.toLocaleTimeString()}
-                            </p>
+                            <div
+                              className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                                message.sender === "responder"
+                                  ? "bg-red-100 dark:bg-red-900 text-red-900 dark:text-red-100"
+                                  : "bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100"
+                              }`}
+                            >
+                              <p>{message.content}</p>
+                              <p className="text-xs opacity-70 mt-1">
+                                {message.timestamp.toLocaleTimeString()}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-              <CardFooter>
-                <form onSubmit={sendMessage} className="flex gap-2 w-full">
-                  <Input
-                    placeholder="Type your message..."
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button type="submit">Send</Button>
-                </form>
-              </CardFooter>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <form onSubmit={sendMessage} className="flex gap-2 w-full">
+                    <Input
+                      placeholder="Type your message..."
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button type="submit">Send</Button>
+                  </form>
+                </CardFooter>
+              </div>
             </Card>
           )}
         </div>
       </div>
-    </section>
+    </div>
   );
 };
 
