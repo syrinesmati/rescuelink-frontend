@@ -2,10 +2,16 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Shield, AlertTriangle } from "lucide-react";
+import { Shield, AlertTriangle, LocateFixed, LocateOff } from "lucide-react";
 
 type ReportStatus = "Received" | "Dispatched" | "In Progress" | "Resolved";
 
@@ -13,6 +19,7 @@ interface EmergencyReport {
   id: number;
   description: string;
   location: string;
+  coordinates: { lat: number; lng: number } | null;
   status: ReportStatus;
   submittedAt: Date;
 }
@@ -22,6 +29,7 @@ const initialReports: EmergencyReport[] = [
     id: 1,
     description: "Car accident on 5th Avenue, need medical assistance.",
     location: "5th Avenue, City Center",
+    coordinates: { lat: 40.7128, lng: -74.006 },
     status: "Dispatched",
     submittedAt: new Date(Date.now() - 1000 * 60 * 60),
   },
@@ -29,6 +37,7 @@ const initialReports: EmergencyReport[] = [
     id: 2,
     description: "Fire in a residential building on Elm Street.",
     location: "Elm Street, Block 3",
+    coordinates: { lat: 40.7357, lng: -74.0034 },
     status: "In Progress",
     submittedAt: new Date(Date.now() - 1000 * 60 * 30),
   },
@@ -37,18 +46,99 @@ const initialReports: EmergencyReport[] = [
 const CitizenPage = () => {
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
+  const [coordinates, setCoordinates] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
   const [reports, setReports] = useState<EmergencyReport[]>(initialReports);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
+  const handleGetLocation = () => {
+    if (!navigator.geolocation) {
+      toast({
+        variant: "destructive",
+        title: "Geolocation not supported",
+        description: "Your browser doesn't support geolocation.",
+      });
+      return;
+    }
+
+    setIsLocating(true);
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        setCoordinates({ lat: latitude, lng: longitude });
+
+        try {
+          // Reverse geocoding to get address from coordinates
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+          );
+          const data = await response.json();
+
+          let address = "";
+          if (data.address) {
+            const { road, house_number, suburb, city, county, state, country } =
+              data.address;
+            address = [
+              house_number ? `${house_number} ` : "",
+              road || "",
+              suburb ? `, ${suburb}` : "",
+              city ? `, ${city}` : county ? `, ${county}` : "",
+              state ? `, ${state}` : "",
+              country ? `, ${country}` : "",
+            ].join("");
+          }
+
+          setLocation(
+            address ||
+              `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`
+          );
+        } catch (error) {
+          console.error("Reverse geocoding failed:", error);
+          setLocation(
+            `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`
+          );
+        }
+
+        setIsLocating(false);
+      },
+      (error) => {
+        setIsLocating(false);
+        toast({
+          variant: "destructive",
+          title: "Location error",
+          description: error.message || "Unable to retrieve your location.",
+        });
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!description.trim() || !location.trim()) {
+    if (!description.trim()) {
       toast({
         variant: "destructive",
         title: "Missing information",
-        description: "Please fill out both description and location.",
+        description: "Please describe the emergency.",
+      });
+      return;
+    }
+
+    if (!coordinates) {
+      toast({
+        variant: "destructive",
+        title: "Location required",
+        description: "Please get your location before submitting.",
       });
       return;
     }
@@ -60,13 +150,19 @@ const CitizenPage = () => {
       const newReport: EmergencyReport = {
         id: reports.length + 1,
         description,
-        location,
+        location:
+          location ||
+          `Coordinates: ${coordinates.lat.toFixed(
+            4
+          )}, ${coordinates.lng.toFixed(4)}`,
+        coordinates,
         status: "Received",
         submittedAt: new Date(),
       };
       setReports([newReport, ...reports]);
       setDescription("");
       setLocation("");
+      setCoordinates(null);
       setIsSubmitting(false);
       toast({
         title: "Report submitted",
@@ -122,20 +218,50 @@ const CitizenPage = () => {
                   required
                 />
               </div>
+
               <div className="space-y-2">
-                <Input
-                  type="text"
-                  placeholder="Location (e.g. street address or landmark)"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  className="focus:ring-2 focus:ring-offset-1 focus:ring-red-500 focus:outline-none"
-                  required
-                />
+                <div className="flex gap-2">
+                  <Input
+                    type="text"
+                    placeholder="Your location will appear here"
+                    value={location}
+                    readOnly
+                    className="focus:ring-2 focus:ring-offset-1 focus:ring-red-500 focus:outline-none"
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleGetLocation}
+                    disabled={isLocating}
+                    className="flex items-center gap-2"
+                  >
+                    {isLocating ? (
+                      <>
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent border-solid" />
+                        Locating...
+                      </>
+                    ) : (
+                      <>
+                        {coordinates ? (
+                          <LocateFixed className="h-4 w-4" />
+                        ) : (
+                          <LocateOff className="h-4 w-4" />
+                        )}
+                        {coordinates ? "Update" : "Get"} Location
+                      </>
+                    )}
+                  </Button>
+                </div>
+                {coordinates && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Coordinates: {coordinates.lat.toFixed(6)},{" "}
+                    {coordinates.lng.toFixed(6)}
+                  </p>
+                )}
               </div>
               <Button
                 type="submit"
                 className="w-full emergency-btn transition-transform duration-200 active:scale-95"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !coordinates}
               >
                 {isSubmitting ? (
                   <span className="flex items-center gap-2">
@@ -179,6 +305,12 @@ const CitizenPage = () => {
                         <p className="text-sm text-slate-600 dark:text-slate-300">
                           <strong>Location:</strong> {report.location}
                         </p>
+                        {report.coordinates && (
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            Coordinates: {report.coordinates.lat.toFixed(6)},{" "}
+                            {report.coordinates.lng.toFixed(6)}
+                          </p>
+                        )}
                         <div className="flex items-center justify-between">
                           <span
                             className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
