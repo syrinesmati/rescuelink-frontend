@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +12,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Shield, AlertTriangle, LocateFixed, LocateOff } from "lucide-react";
+import { fetchEmergencyReports, submitEmergencyReport } from "@/api/rescueApi";
 
 type ReportStatus = "Received" | "Dispatched" | "In Progress" | "Resolved";
 
@@ -24,25 +25,6 @@ interface EmergencyReport {
   submittedAt: Date;
 }
 
-const initialReports: EmergencyReport[] = [
-  {
-    id: 1,
-    description: "Car accident on 5th Avenue, need medical assistance.",
-    location: "5th Avenue, City Center",
-    coordinates: { lat: 40.7128, lng: -74.006 },
-    status: "Dispatched",
-    submittedAt: new Date(Date.now() - 1000 * 60 * 60),
-  },
-  {
-    id: 2,
-    description: "Fire in a residential building on Elm Street.",
-    location: "Elm Street, Block 3",
-    coordinates: { lat: 40.7357, lng: -74.0034 },
-    status: "In Progress",
-    submittedAt: new Date(Date.now() - 1000 * 60 * 30),
-  },
-];
-
 const CitizenPage = () => {
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
@@ -51,9 +33,47 @@ const CitizenPage = () => {
     lng: number;
   } | null>(null);
   const [isLocating, setIsLocating] = useState(false);
-  const [reports, setReports] = useState<EmergencyReport[]>(initialReports);
+  const [reports, setReports] = useState<EmergencyReport[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+
+  // Fetch reports on component mount
+  useEffect(() => {
+    const loadReports = async () => {
+      try {
+        const apiReports = await fetchEmergencyReports();
+        const formattedReports = apiReports.map((report) => ({
+          id: report.id,
+          description: report.description,
+          location:
+            report.location?.address ||
+            `Lat: ${report.location?.latitude.toFixed(
+              4
+            )}, Lng: ${report.location?.longitude.toFixed(4)}`,
+          coordinates: report.location
+            ? {
+                lat: report.location.latitude,
+                lng: report.location.longitude,
+              }
+            : null,
+          status: report.status as ReportStatus,
+          submittedAt: new Date(report.reportedAt || report.submittedAt),
+        }));
+        setReports(formattedReports);
+      } catch (error) {
+        toast({
+          variant: "destructive",
+          title: "Error loading reports",
+          description: "Failed to fetch emergency reports",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadReports();
+  }, []);
 
   const handleGetLocation = () => {
     if (!navigator.geolocation) {
@@ -73,7 +93,6 @@ const CitizenPage = () => {
         setCoordinates({ lat: latitude, lng: longitude });
 
         try {
-          // Reverse geocoding to get address from coordinates
           const response = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
           );
@@ -122,7 +141,7 @@ const CitizenPage = () => {
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!description.trim()) {
@@ -145,31 +164,59 @@ const CitizenPage = () => {
 
     setIsSubmitting(true);
 
-    // Simulate report submission delay
-    setTimeout(() => {
-      const newReport: EmergencyReport = {
-        id: reports.length + 1,
+    try {
+      const newReport = await submitEmergencyReport({
         description,
-        location:
-          location ||
-          `Coordinates: ${coordinates.lat.toFixed(
-            4
-          )}, ${coordinates.lng.toFixed(4)}`,
-        coordinates,
-        status: "Received",
-        submittedAt: new Date(),
-      };
-      setReports([newReport, ...reports]);
+        location: {
+          latitude: coordinates.lat,
+          longitude: coordinates.lng,
+          address: location || undefined,
+        },
+        urgencyLevel: 3, // Default urgency
+        citizenId: 1, // Should come from auth in real app
+      });
+
+      // Add the new report to local state
+      setReports([
+        {
+          id: newReport.id,
+          description: newReport.description,
+          location:
+            newReport.location?.address ||
+            `Lat: ${newReport.location?.latitude.toFixed(
+              4
+            )}, Lng: ${newReport.location?.longitude.toFixed(4)}`,
+          coordinates: newReport.location
+            ? {
+                lat: newReport.location.latitude,
+                lng: newReport.location.longitude,
+              }
+            : null,
+          status: newReport.status as ReportStatus,
+          submittedAt: new Date(newReport.reportedAt || newReport.submittedAt),
+        },
+        ...reports,
+      ]);
+
+      // Reset form
       setDescription("");
       setLocation("");
       setCoordinates(null);
-      setIsSubmitting(false);
+
       toast({
         title: "Report submitted",
         description:
           "Your emergency report has been received and will be processed shortly.",
       });
-    }, 1000);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Submission failed",
+        description: "There was an error submitting your report.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getStatusColor = (status: ReportStatus) => {
@@ -184,6 +231,14 @@ const CitizenPage = () => {
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100";
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500"></div>
+      </div>
+    );
+  }
 
   return (
     <section className="min-h-screen bg-gradient-to-b from-slate-50 to-red-50 dark:from-slate-900 dark:to-red-950/30 p-6">
