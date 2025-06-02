@@ -1,90 +1,175 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Check, ArrowRight, MapPin, Clock, MessageCircle } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MapPin, MessageCircle, Check, ArrowRight, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { fetchResponderMissions, updateMissionStatus, sendMissionMessage ,fetchMissions} from "@/api/rescueApi";
+import { useNavigate } from "react-router-dom";
+import {jwtDecode} from "jwt-decode";
+import {
+  EmergencyStatus,
+  MissionStatus,
+  ResponderRoleEnum,
+  ResponderStatusEnum,
+  UserRoleEnum
+}from "@/enums/types"
+import { from } from "@apollo/client";
 
-type MissionStatus = "Assigned" | "En Route" | "On Site" | "Completed";
 
-interface Mission {
-  id: number;
+
+export interface User {
+  id: string;
+  username: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  profilePicture?: string;
+  cin: string;
+  role: UserRoleEnum;
+  responderRole: ResponderRoleEnum;
+  ResponderStatus: ResponderStatusEnum;
+  reports: EmergencyReport[];
+  coordinatedMissions: Mission[]; // Attention : circular reference, peut être omis si inutile
+}
+
+export interface EmergencyReport {
+  id: string;
+  citizen: User;
   description: string;
   location: string;
-  status: MissionStatus;
-  assignedAt: Date;
+  mediaUrl?: string;
+  mission?: Mission; // mission peut être nul si non encore affectée
+  reportedAt: string; // ISO date string
+  resolvedAt?: string;
+  status: EmergencyStatus;
+  urgencyLevel: number;
 }
+
+export interface MissionLog {
+  id: string;
+  createdAt: string;
+  message: string;
+  statusChangeTo: string;
+  mission: Mission;
+  user: User;
+}
+
+export interface Mission {
+  id: string;
+  assignedResponders: User[];
+  coordinator: User;
+  startTime: string;
+  endTime: string;
+  incident: EmergencyReport;
+  logs: MissionLog[];
+  status: MissionStatus;
+}
+
 
 interface Message {
   id: number;
-  sender: "coordinator" | "responder";
+  sender: "COORDINATOR" | "RESPONDER";
   content: string;
-  timestamp: Date;
-  missionId: number;
+  timestamp: string;
 }
 
-const initialMissions: Mission[] = [
-  {
-    id: 1,
-    description: "Respond to car accident on 5th Avenue",
-    location: "5th Avenue, City Center",
-    status: "Assigned",
-    assignedAt: new Date(Date.now() - 1000 * 60 * 15),
-  },
-  {
-    id: 2,
-    description: "Assist with fire evacuation on Elm Street",
-    location: "Elm Street, Block 3",
-    status: "En Route",
-    assignedAt: new Date(Date.now() - 1000 * 60 * 5),
-  },
-];
-
-const initialMessages: Message[] = [
-  {
-    id: 1,
-    sender: "coordinator",
-    content: "Please confirm your ETA to the accident site.",
-    timestamp: new Date(Date.now() - 1000 * 60 * 10),
-    missionId: 1,
-  },
-  {
-    id: 2,
-    sender: "coordinator",
-    content: "Be advised: Traffic congestion reported on Main Street. Consider alternate route.",
-    timestamp: new Date(Date.now() - 1000 * 60 * 3),
-    missionId: 1,
-  },
-  {
-    id: 3,
-    sender: "coordinator",
-    content: "Fire department is already on site. Focus on evacuation assistance.",
-    timestamp: new Date(Date.now() - 1000 * 60 * 2),
-    missionId: 2,
-  },
-];
+interface DecodedToken {
+  role: string;
+}
 
 const ResponderPage = () => {
-  const [missions, setMissions] = useState<Mission[]>(initialMissions);
+  const navigate = useNavigate();
+  const [missions, setMissions] = useState<Mission[]>([]);
   const [selectedMission, setSelectedMission] = useState<Mission | null>(null);
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [currentLocation, setCurrentLocation] = useState<GeolocationCoordinates | null>(null);
   const [locationSharing, setLocationSharing] = useState(false);
-  const [locationError, setLocationError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  
 
+   // Check authentication on mount
+   useEffect(() => {
+    const token = localStorage.getItem("accessToken");
+    console.log("🪪 Raw token:", token);
+  
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+  
+    try {
+      const rawToken = token.startsWith("Bearer ") ? token.slice(7) : token;
+      const decoded: DecodedToken = jwtDecode(rawToken);
+      console.log("✅ Decoded token:", decoded);
+  
+      const role = Array.isArray(decoded.role) ? decoded.role[0] : decoded.role;
+  
+      if (role !== "RESPONDER") {
+        toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Sorry,it isn't your role.",
+      });
+        window.location.href = "http://localhost:8080/";
+        return;
+      }
+  
+    } catch (error) {
+      console.error("❌ Error decoding token:", error);
+      localStorage.removeItem("accessToken");
+      navigate("/login");
+    }
+  }, [navigate]);
+  
+
+  // Fetch missions assigned to this responder
+  useEffect(() => {
+    const loadMissions = async () => {
+      try {
+        const data = await fetchMissions();
+        setMissions(data);
+      } catch (error) {
+        toast({
+          variant: "destructive",
+          title: "Error loading missions",
+          description: "Failed to fetch your assigned missions",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadMissions();
+  }, []);
+
+/*
+  // Load messages when selecting a mission
+  useEffect(() => {
+    if (selectedMission) {
+      // In a real app, you would fetch messages from your API here
+      // For now we'll use mock messages
+      setMessages([
+        {
+          id: 1,
+          sender: "COORDINATOR",
+          content: `Please confirm your ETA for mission ${selectedMission.id}`,
+          timestamp: new Date().toISOString(),
+        }
+      ]);
+    }
+  }, [selectedMission]);
+
+  */
+
+  // Handle location sharing
   useEffect(() => {
     if (locationSharing) {
       const watchId = navigator.geolocation.watchPosition(
-        (position) => {
-          setCurrentLocation(position.coords);
-          setLocationError(null);
-        },
+        (position) => setCurrentLocation(position.coords),
         (error) => {
-          setLocationError(`Error getting location: ${error.message}`);
-          setLocationSharing(false);
           toast({
             variant: "destructive",
             title: "Location error",
@@ -93,271 +178,235 @@ const ResponderPage = () => {
         },
         { enableHighAccuracy: true }
       );
-
       return () => navigator.geolocation.clearWatch(watchId);
     }
   }, [locationSharing, toast]);
 
-  const updateMissionStatus = (id: number, newStatus: MissionStatus) => {
-    setMissions((prevMissions) =>
-      prevMissions.map((mission) =>
-        mission.id === id ? { ...mission, status: newStatus } : mission
-      )
-    );
-
-    toast({
-      title: "Status updated",
-      description: `Mission status updated to ${newStatus}`,
-    });
-  };
-
-  const toggleLocationSharing = () => {
-    if (!locationSharing) {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            setCurrentLocation(position.coords);
-            setLocationSharing(true);
-            toast({
-              title: "Location sharing activated",
-              description: "Your location is now being shared with coordinators.",
-            });
-          },
-          (error) => {
-            setLocationError(`Error getting location: ${error.message}`);
-            toast({
-              variant: "destructive",
-              title: "Location error",
-              description: error.message,
-            });
-          }
-        );
-      } else {
-        setLocationError("Geolocation is not supported by this browser.");
-        toast({
-          variant: "destructive",
-          title: "Location error",
-          description: "Geolocation is not supported by this browser.",
-        });
-      }
-    } else {
-      setLocationSharing(false);
+  const handleStatusUpdate = async (missionId: number, newStatus: MissionStatus) => {
+    try {
+      await updateMissionStatus(missionId, newStatus);
+      setMissions(missions.map(mission => 
+        mission.id === missionId.toString() ? { ...mission, status: newStatus } : mission
+      ));
       toast({
-        title: "Location sharing deactivated",
-        description: "Your location is no longer being shared.",
+        title: "Status updated",
+        description: `Mission status changed to ${newStatus.replace('_', ' ')}`,
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Update failed",
+        description: "Failed to update mission status",
       });
     }
   };
 
-  const sendMessage = (e: React.FormEvent) => {
+
+
+
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!newMessage.trim() || !selectedMission) return;
-    
-    const message: Message = {
-      id: messages.length + 1,
-      sender: "responder",
-      content: newMessage,
-      timestamp: new Date(),
-      missionId: selectedMission.id,
-    };
-    
-    setMessages([...messages, message]);
-    setNewMessage("");
-    
-    setTimeout(() => {
-      const reply: Message = {
-        id: messages.length + 2,
-        sender: "coordinator",
-        content: "Message received. Stand by for further instructions.",
-        timestamp: new Date(),
-        missionId: selectedMission.id,
+
+    try {
+      // In a real app, you would send this to your API
+      const sentMessage = {
+        id: messages.length + 1,
+        sender: "RESPONDER" as const,
+        content: newMessage,
+        timestamp: new Date().toISOString(),
       };
       
-      setMessages(prev => [...prev, reply]);
-    }, 3000);
+      await sendMissionMessage(+selectedMission.id, newMessage);
+      setMessages([...messages, sentMessage]);
+      setNewMessage("");
+      
+      // Simulate coordinator reply
+      setTimeout(() => {
+        setMessages(prev => [...prev, {
+          id: prev.length + 2,
+          sender: "COORDINATOR",
+          content: "Message received. Stand by for further instructions.",
+          timestamp: new Date().toISOString(),
+        }]);
+      }, 2000);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Message failed",
+        description: "Failed to send message",
+      });
+    }
   };
 
-  const filteredMessages = messages.filter(
-    (message) => selectedMission && message.missionId === selectedMission.id
-  );
+  
+  const toggleLocationSharing = () => {
+    setLocationSharing(!locationSharing);
+    toast({
+      title: locationSharing ? "Location sharing stopped" : "Location sharing activated",
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500"></div>
+      </div>
+    );
+  }
+
+  console.log(missions);
+  
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-red-50 dark:from-slate-900 dark:to-red-950/30 flex items-center justify-center p-6">
-      <div className="max-w-7xl w-full mx-auto space-y-8">
-        <div className="text-center space-y-2">
-          <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-red-600 to-orange-500 bg-clip-text text-transparent">
-            Responder Dashboard
-          </h2>
-          <p className="text-slate-600 dark:text-slate-300">
-            View and manage your assigned missions in real-time
-          </p>
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-red-50 p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-red-600 mb-2">Responder Portal</h1>
+          <p className="text-gray-600">Your assigned missions</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div>
+          <div className="space-y-6">
             {missions.length === 0 ? (
-              <p className="text-center text-gray-500 dark:text-gray-400">
-                No missions assigned currently.
-              </p>
+              <Card>
+                <CardContent className="py-8 text-center">
+                  <p className="text-gray-500">No missions assigned to you currently</p>
+                </CardContent>
+              </Card>
             ) : (
-              <div className="space-y-6">
-                {missions.map((mission) => (
-                  <Card key={mission.id} className="border border-red-200 dark:border-red-900/40 shadow-md rounded-2xl overflow-hidden transition-all duration-200 hover:shadow-lg">
-                    <div className="border-l-4 border-red-600 dark:border-red-400 h-full">
-                      <CardHeader>
-                        <CardTitle className="text-red-700 dark:text-red-400">
-                          Mission #{mission.id}
-                        </CardTitle>
-                        <CardDescription>{mission.description}</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="mb-2 text-gray-800 dark:text-gray-200 flex items-center gap-1">
-                          <MapPin className="inline-block w-4 h-4 text-red-600 dark:text-red-500" />
-                          <span>{mission.location}</span>
-                        </p>
-                        <p className="text-sm mb-4 text-red-700 dark:text-red-400 font-semibold">
-                          Status: {mission.status}
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            variant={mission.status === "Assigned" ? "destructive" : "outline"}
-                            size="sm"
-                            disabled={mission.status !== "Assigned"}
-                            onClick={() => updateMissionStatus(mission.id, "En Route")}
-                          >
-                            <ArrowRight className="w-4 h-4" /> En Route
-                          </Button>
-                          <Button
-                            variant={mission.status === "En Route" ? "destructive" : "outline"}
-                            size="sm"
-                            disabled={mission.status !== "En Route"}
-                            onClick={() => updateMissionStatus(mission.id, "On Site")}
-                          >
-                            <Clock className="w-4 h-4" /> On Site
-                          </Button>
-                          <Button
-                            variant={mission.status === "On Site" ? "destructive" : "outline"}
-                            size="sm"
-                            disabled={mission.status !== "On Site"}
-                            onClick={() => updateMissionStatus(mission.id, "Completed")}
-                          >
-                            <Check className="w-4 h-4" /> Completed
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setSelectedMission(mission)}
-                          >
-                            <MessageCircle className="w-4 h-4" /> Chat
-                          </Button>
-                        </div>
-                        <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                          Assigned: {mission.assignedAt.toLocaleString()}
-                        </p>
-                      </CardContent>
+              missions.map((mission) => (
+                <Card key={mission.id} className="border-l-4 border-red-500">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Mission #{mission.id}</CardTitle>
+                    <p className="font-medium">{mission.incident.description}</p>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center gap-2 text-sm">
+                      <MapPin className="w-4 h-4 text-red-500" />
+                      <span>{mission.incident.location}</span>
                     </div>
-                  </Card>
-                ))}
-              </div>
+
+                    <div className="space-y-2">
+                      {["ASSIGNED", "EN_ROUTE", "ON_SITE", "COMPLETED"].map((status) => (
+                        <div key={status} className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={mission.status === status}
+                            readOnly
+                            className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                          />
+                          <span>{status.replace('_', ' ')}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant={mission.status === "ASSIGNED" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleStatusUpdate(+mission.id, MissionStatus.EN_ROUTE)}
+                        disabled={mission.status !== "ASSIGNED"}
+                      >
+                        <ArrowRight className="mr-2 h-4 w-4" />
+                        Mark En Route
+                      </Button>
+                      <Button
+                        variant={mission.status === "EN_ROUTE" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleStatusUpdate(+mission.id, MissionStatus.ON_SITE)}
+                        disabled={mission.status !== "EN_ROUTE"}
+                      >
+                        <Clock className="mr-2 h-4 w-4" />
+                        Mark On Site
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedMission(mission)}
+                      >
+                        <MessageCircle className="mr-2 h-4 w-4" />
+                        Chat
+                      </Button>
+                    </div>
+
+                    <p className="text-xs text-gray-500">
+                      Assigned: {new Date(mission.startTime).toLocaleString()}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))
             )}
 
-            <Card className="mt-6 border border-red-200 dark:border-red-900/40 shadow-md rounded-2xl overflow-hidden transition-all duration-200 hover:shadow-lg">
-              <div className="border-l-4 border-red-600 dark:border-red-400 h-full">
-                <CardHeader>
-                  <CardTitle className="text-red-700 dark:text-red-400">
-                    Location Sharing
-                  </CardTitle>
-                  <CardDescription>
-                    Share your real-time location with coordinators
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-col gap-4">
-                    <Button 
-                      onClick={toggleLocationSharing}
-                      variant={locationSharing ? "destructive" : "default"}
-                    >
-                      <MapPin className="w-4 h-4 mr-2" />
-                      {locationSharing ? "Stop Sharing Location" : "Share My Location"}
-                    </Button>
-                    
-                    {locationError && (
-                      <p className="text-red-500 text-sm">{locationError}</p>
-                    )}
-                    
-                    {currentLocation && locationSharing && (
-                      <div className="text-sm">
-                        <p className="font-medium">Current coordinates:</p>
-                        <p>Latitude: {currentLocation.latitude.toFixed(6)}</p>
-                        <p>Longitude: {currentLocation.longitude.toFixed(6)}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Accuracy: ±{currentLocation.accuracy.toFixed(1)} meters
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </div>
+            <Card className="border-l-4 border-red-500">
+              <CardHeader>
+                <CardTitle>Location Sharing</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-4">
+                  <Button
+                    onClick={toggleLocationSharing}
+                    variant={locationSharing ? "default" : "outline"}
+                  >
+                    {locationSharing ? "Sharing Active" : "Share Location"}
+                  </Button>
+                  {currentLocation && locationSharing && (
+                    <div className="text-sm">
+                      <p>
+                        Coordinates: {currentLocation.latitude.toFixed(6)},{" "}
+                        {currentLocation.longitude.toFixed(6)}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
             </Card>
           </div>
 
           {selectedMission && (
-            <Card className="border border-red-200 dark:border-red-900/40 shadow-md rounded-2xl overflow-hidden transition-all duration-200 hover:shadow-lg">
-              <div className="border-l-4 border-red-600 dark:border-red-400 h-full">
-                <CardHeader>
-                  <CardTitle className="text-red-700 dark:text-red-400">
-                    Chat - Mission #{selectedMission.id}
-                  </CardTitle>
-                  <CardDescription>
-                    Communicate with coordinators about your mission
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[400px] overflow-y-auto bg-gray-50 dark:bg-gray-800 rounded-md p-4 mb-4">
-                    {filteredMessages.length === 0 ? (
-                      <p className="text-center text-gray-500 dark:text-gray-400">
-                        No messages yet
-                      </p>
-                    ) : (
-                      <div className="space-y-4">
-                        {filteredMessages.map((message) => (
-                          <div
-                            key={message.id}
-                            className={`flex ${
-                              message.sender === "responder" ? "justify-end" : "justify-start"
-                            }`}
-                          >
-                            <div
-                              className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                                message.sender === "responder"
-                                  ? "bg-red-100 dark:bg-red-900 text-red-900 dark:text-red-100"
-                                  : "bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100"
-                              }`}
-                            >
-                              <p>{message.content}</p>
-                              <p className="text-xs opacity-70 mt-1">
-                                {message.timestamp.toLocaleTimeString()}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
+            <Card className="border-l-4 border-red-500 h-fit">
+              <CardHeader>
+                <CardTitle>
+                  Mission #{selectedMission.id} Chat
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-96 overflow-y-auto space-y-4 mb-4">
+                  {messages.length === 0 ? (
+                    <p className="text-center text-gray-500 py-8">
+                      No messages yet
+                    </p>
+                  ) : (
+                    messages.map((message) => (
+                      <div
+                        key={message.id}
+                        className={`flex ${message.sender === "RESPONDER" ? "justify-end" : "justify-start"}`}
+                      >
+                        <div
+                          className={`max-w-[75%] rounded-lg px-4 py-2 ${
+                            message.sender === "RESPONDER"
+                              ? "bg-red-100 text-red-900"
+                              : "bg-gray-100 text-gray-900"
+                          }`}
+                        >
+                          <p>{message.content}</p>
+                          <p className="text-xs opacity-70 mt-1">
+                            {new Date(message.timestamp).toLocaleTimeString()}
+                          </p>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <form onSubmit={sendMessage} className="flex gap-2 w-full">
-                    <Input
-                      placeholder="Type your message..."
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Button type="submit">Send</Button>
-                  </form>
-                </CardFooter>
-              </div>
+                    ))
+                  )}
+                </div>
+                <form onSubmit={handleSendMessage} className="flex gap-2">
+                  <Input
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type your message..."
+                  />
+                  <Button type="submit">Send</Button>
+                </form>
+              </CardContent>
             </Card>
           )}
         </div>

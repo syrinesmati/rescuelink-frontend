@@ -12,6 +12,8 @@ import CitizenPage from "./pages/Citizen";
 import ResponderPage from "./pages/Responder";
 import CoordinatorPage from "./pages/Coordinator";
 import NotFound from "./pages/NotFound";
+import CoordinatorPage2 from "./pages/Coordinator2";
+import CoordinatorPage3 from "./pages/Coordinator3";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +31,7 @@ const App = () => (
             <Route path="/citizen" element={<CitizenPage />} />
             <Route path="/responder" element={<ResponderPage />} />
             <Route path="/coordinator" element={<CoordinatorPage />} />
+            <Route path="/coordinator3" element={<CoordinatorPage3/>}  />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>

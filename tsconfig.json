@@ -7,8 +7,10 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@/types/*": ["src/types/*"]
     },
+    "include": ["src/**/*"],
     "noImplicitAny": false,
     "noUnusedParameters": false,
     "skipLibCheck": true,

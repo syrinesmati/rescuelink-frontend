@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import {
   Card,
@@ -42,9 +42,19 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { useNavigate } from "react-router-dom";
+import {jwtDecode} from "jwt-decode";
+
+
+
 
 type EmergencyStatus = "Received" | "Dispatched" | "In Progress" | "Resolved";
 type EmergencyUrgency = "Low" | "Medium" | "High" | "Critical";
+
+// Type for the decoded token (adjust if you use other fields)
+interface DecodedToken {
+  role: string;
+}
 
 interface Responder {
   id: number;
@@ -121,6 +131,7 @@ const timelineData = [
 ];
 
 const CoordinatorPage = () => {
+  const navigate = useNavigate();
   const [emergencies, setEmergencies] = useState<Emergency[]>(emergencyData);
   const [responders, setResponders] = useState<Responder[]>(responderData);
   const [statusFilter, setStatusFilter] = useState<string>("");
@@ -129,6 +140,36 @@ const CoordinatorPage = () => {
   const [selectedEmergency, setSelectedEmergency] = useState<Emergency | null>(
     null
   );
+
+    useEffect(() => {
+     const token = localStorage.getItem("accessToken");
+     console.log("🪪 Raw token:", token);
+   
+     if (!token) {
+       navigate("/login");
+       return;
+     }
+   
+     try {
+       const rawToken = token.startsWith("Bearer ") ? token.slice(7) : token;
+       const decoded: DecodedToken = jwtDecode(rawToken);
+       console.log("✅ Decoded token:", decoded);
+   
+       const role = Array.isArray(decoded.role) ? decoded.role[0] : decoded.role;
+   
+       if (role !== "COORDINATOR") {
+         window.location.href = "http://localhost:8080/";
+         return;
+       }
+   
+     } catch (error) {
+       console.error("❌ Error decoding token:", error);
+       localStorage.removeItem("accessToken");
+       navigate("/login");
+     }
+   }, [navigate]);
+   
+   
   const [chatMessage, setChatMessage] = useState<string>("");
 
   const filteredEmergencies = emergencies.filter((emergency) => {

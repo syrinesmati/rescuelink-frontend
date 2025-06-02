@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { loginUser } from "@/api/rescueApi";
 
 export const LoginForm = () => {
   const [email, setEmail] = useState("");
@@ -20,13 +21,21 @@ export const LoginForm = () => {
     setIsLoading(true);
 
     try {
-      // Supabase sign in will be implemented here
+      const response = await loginUser({ email, password });
+      console.log(response);
       toast({
         title: "Success!",
-        description: "You have successfully logged in.",
+        description: `Welcome back, ${response.user.username}!`,
       });
+
       navigate("/");
+
+      // Refresh the page after successful login
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
     } catch (error) {
+      
       toast({
         variant: "destructive",
         title: "Error",

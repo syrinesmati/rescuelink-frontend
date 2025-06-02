@@ -1,21 +1,40 @@
-import React, { useState, useEffect } from "react";
+"use client";
+
+
+import React,{ useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Shield, AlertTriangle, LocateFixed, LocateOff } from "lucide-react";
-import { fetchEmergencyReports, submitEmergencyReport } from "@/api/rescueApi";
+import { 
+  fetchEmergencyReports, 
+  submitEmergencyReport,
+  updateMissionStatus // Si vous utilisez SSE
+} from "@/api/rescueApi";
+import type { EmergencyReport, MissionStatus } from "@/types/rescue";
+import { useNavigate } from "react-router-dom";
+import {jwtDecode} from "jwt-decode";
 
-type ReportStatus = "Received" | "Dispatched" | "In Progress" | "Resolved";
 
+
+// Utilisez les types du backend
+type ReportStatus = "RECEIVED" | "DISPATCHED" | "IN_PROGRESS" | "RESOLVED";
+
+const CitizenPage = () => {
+  const navigate = useNavigate();
+  const [description, setDescription] = useState("");
+  const [locationName, setLocationName] = useState("");
+  const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  const [reports, setReports] = useState<EmergencyReport[]>([]);
+  const { toast } = useToast();
+
+
+  interface DecodedToken {
+  role: string;
+}
 interface EmergencyReport {
   id: number;
   description: string;
@@ -25,144 +44,92 @@ interface EmergencyReport {
   submittedAt: Date;
 }
 
-const CitizenPage = () => {
-  const [description, setDescription] = useState("");
-  const [location, setLocation] = useState("");
-  const [coordinates, setCoordinates] = useState<{
-    lat: number;
-    lng: number;
-  } | null>(null);
-  const [isLocating, setIsLocating] = useState(false);
-  const [reports, setReports] = useState<EmergencyReport[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
 
-  // Fetch reports on component mount
+  
+  // Check authentication on mount
+ useEffect(() => {
+  const token = localStorage.getItem("accessToken");
+  console.log("🪪 Raw token:", token);
+
+  if (!token) {
+    navigate("/login");
+    return;
+  }
+
+  try {
+    const rawToken = token.startsWith("Bearer ") ? token.slice(7) : token;
+    const decoded: DecodedToken = jwtDecode(rawToken);
+    console.log("✅ Decoded token:", decoded);
+
+    const role = Array.isArray(decoded.role) ? decoded.role[0] : decoded.role;
+
+    if (role !== "CITIZEN") {
+      window.location.href = "http://localhost:8080/";
+      return;
+    }
+
+  } catch (error) {
+    console.error("❌ Error decoding token:", error);
+    localStorage.removeItem("accessToken");
+    navigate("/login");
+  }
+}, [navigate]);
+
+
+  // Chargement initial des rapports
   useEffect(() => {
     const loadReports = async () => {
       try {
-        const apiReports = await fetchEmergencyReports();
-        const formattedReports = apiReports.map((report) => ({
-          id: report.id,
-          description: report.description,
-          location:
-            report.location?.address ||
-            `Lat: ${report.location?.latitude.toFixed(
-              4
-            )}, Lng: ${report.location?.longitude.toFixed(4)}`,
-          coordinates: report.location
-            ? {
-                lat: report.location.latitude,
-                lng: report.location.longitude,
-              }
-            : null,
-          status: report.status as ReportStatus,
-          submittedAt: new Date(report.reportedAt || report.submittedAt),
-        }));
-        setReports(formattedReports);
+        const data = await fetchEmergencyReports();
+        setReports(data);
       } catch (error) {
         toast({
           variant: "destructive",
-          title: "Error loading reports",
-          description: "Failed to fetch emergency reports",
+          title: "Erreur",
+          description: "Échec du chargement des rapports",
         });
-      } finally {
-        setIsLoading(false);
       }
     };
-
     loadReports();
   }, []);
 
-  const handleGetLocation = () => {
-    if (!navigator.geolocation) {
+  // Géolocalisation optimisée
+  const handleGetLocation = async () => {
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000
+        });
+      });
+
+      const { latitude, longitude } = position.coords;
+      setCoordinates({ lat: latitude, lng: longitude });
+
+      // Reverse geocoding simplifié
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+      );
+      const { address } = await response.json();
+      setLocationName(address?.display_name || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+      
+    } catch (error) {
       toast({
         variant: "destructive",
-        title: "Geolocation not supported",
-        description: "Your browser doesn't support geolocation.",
+        title: "Erreur de localisation",
+        description: error instanceof Error ? error.message : "Impossible de déterminer la position",
       });
-      return;
     }
-
-    setIsLocating(true);
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        setCoordinates({ lat: latitude, lng: longitude });
-
-        try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-          );
-          const data = await response.json();
-
-          let address = "";
-          if (data.address) {
-            const { road, house_number, suburb, city, county, state, country } =
-              data.address;
-            address = [
-              house_number ? `${house_number} ` : "",
-              road || "",
-              suburb ? `, ${suburb}` : "",
-              city ? `, ${city}` : county ? `, ${county}` : "",
-              state ? `, ${state}` : "",
-              country ? `, ${country}` : "",
-            ].join("");
-          }
-
-          setLocation(
-            address ||
-              `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`
-          );
-        } catch (error) {
-          console.error("Reverse geocoding failed:", error);
-          setLocation(
-            `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`
-          );
-        }
-
-        setIsLocating(false);
-      },
-      (error) => {
-        setIsLocating(false);
-        toast({
-          variant: "destructive",
-          title: "Location error",
-          description: error.message || "Unable to retrieve your location.",
-        });
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-      }
-    );
   };
 
+  // Soumission du rapport
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!description.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Missing information",
-        description: "Please describe the emergency.",
-      });
-      return;
-    }
-
+    
     if (!coordinates) {
-      toast({
-        variant: "destructive",
-        title: "Location required",
-        description: "Please get your location before submitting.",
-      });
+      toast({ title: "Localisation requise", variant: "destructive" });
       return;
     }
-
-    setIsSubmitting(true);
 
     try {
       const newReport = await submitEmergencyReport({
@@ -170,81 +137,48 @@ const CitizenPage = () => {
         location: {
           latitude: coordinates.lat,
           longitude: coordinates.lng,
-          address: location || undefined,
+          address: locationName
         },
-        urgencyLevel: 3, // Default urgency
-        citizenId: 1, // Should come from auth in real app
+        urgencyLevel: 3,
+        citizenId: 1 // À remplacer par l'ID réel après auth
       });
 
-      // Add the new report to local state
-      setReports([
-        {
-          id: newReport.id,
-          description: newReport.description,
-          location:
-            newReport.location?.address ||
-            `Lat: ${newReport.location?.latitude.toFixed(
-              4
-            )}, Lng: ${newReport.location?.longitude.toFixed(4)}`,
-          coordinates: newReport.location
-            ? {
-                lat: newReport.location.latitude,
-                lng: newReport.location.longitude,
-              }
-            : null,
-          status: newReport.status as ReportStatus,
-          submittedAt: new Date(newReport.reportedAt || newReport.submittedAt),
-        },
-        ...reports,
-      ]);
-
-      // Reset form
-      setDescription("");
-      setLocation("");
-      setCoordinates(null);
-
-      toast({
-        title: "Report submitted",
-        description:
-          "Your emergency report has been received and will be processed shortly.",
-      });
+      setReports([newReport, ...reports]);
+      resetForm();
+      
+      toast({ title: "Rapport envoyé !" });
     } catch (error) {
       toast({
         variant: "destructive",
-        title: "Submission failed",
-        description: "There was an error submitting your report.",
+        title: "Échec de l'envoi",
+        description: "Veuillez réessayer plus tard"
       });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
-  const getStatusColor = (status: ReportStatus) => {
-    switch (status) {
-      case "Received":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100";
-      case "Dispatched":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100";
-      case "In Progress":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100";
-      case "Resolved":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100";
-    }
+  const resetForm = () => {
+    setDescription("");
+    setLocationName("");
+    setCoordinates(null);
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500"></div>
-      </div>
-    );
-  }
+  // UI Helpers
+  const getStatusVariant = (status: ReportStatus) => {
+    const variants: Record<ReportStatus, string> = {
+      RECEIVED: "bg-blue-100 text-blue-800",
+      DISPATCHED: "bg-yellow-100 text-yellow-800",
+      IN_PROGRESS: "bg-purple-100 text-purple-800",
+      RESOLVED: "bg-green-100 text-green-800"
+    };
+    return variants[status];
+  };
 
   return (
-    <section className="min-h-screen bg-gradient-to-b from-slate-50 to-red-50 dark:from-slate-900 dark:to-red-950/30 p-6">
+    <section className="min-h-screen bg-gradient-to-b from-slate-50 to-red-50 p-6">
       <div className="max-w-4xl mx-auto space-y-8">
+        {/* En-tête */}
         <div className="text-center space-y-2">
-          <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-red-600 to-orange-500 bg-clip-text text-transparent">
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-red-600 to-orange-500 bg-clip-text text-transparent">
             Emergency Reporting Center
           </h2>
           <p className="text-slate-600 dark:text-slate-300">
@@ -252,7 +186,8 @@ const CitizenPage = () => {
           </p>
         </div>
 
-        <Card className="border border-red-200 dark:border-red-900/40 shadow-md rounded-2xl">
+        {/* Formulaire */}
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-red-700 dark:text-red-400">
               <Shield className="h-5 w-5" />
@@ -264,126 +199,62 @@ const CitizenPage = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Textarea
-                  placeholder="Describe the emergency..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="min-h-[120px] resize-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500 focus:outline-none"
-                  required
+              <Textarea
+                placeholder="Describe the emergency..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                required
+              />
+
+              <div className="flex gap-2">
+                <Input
+                  value={locationName}
+                  readOnly
+                  placeholder="Your location will appear here"
                 />
+                <Button
+                  type="button"
+                  onClick={handleGetLocation}
+                  variant={coordinates ? "outline" : "default"}
+                >
+                  {coordinates ? <LocateFixed /> : <LocateOff />}
+                  {coordinates ? "Mettre à jour" : "Get Location"}
+                </Button>
               </div>
 
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <Input
-                    type="text"
-                    placeholder="Your location will appear here"
-                    value={location}
-                    readOnly
-                    className="focus:ring-2 focus:ring-offset-1 focus:ring-red-500 focus:outline-none"
-                  />
-                  <Button
-                    type="button"
-                    onClick={handleGetLocation}
-                    disabled={isLocating}
-                    className="flex items-center gap-2"
-                  >
-                    {isLocating ? (
-                      <>
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent border-solid" />
-                        Locating...
-                      </>
-                    ) : (
-                      <>
-                        {coordinates ? (
-                          <LocateFixed className="h-4 w-4" />
-                        ) : (
-                          <LocateOff className="h-4 w-4" />
-                        )}
-                        {coordinates ? "Update" : "Get"} Location
-                      </>
-                    )}
-                  </Button>
-                </div>
-                {coordinates && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Coordinates: {coordinates.lat.toFixed(6)},{" "}
-                    {coordinates.lng.toFixed(6)}
-                  </p>
-                )}
-              </div>
-              <Button
-                type="submit"
-                className="w-full emergency-btn transition-transform duration-200 active:scale-95"
-                disabled={isSubmitting || !coordinates}
-              >
-                {isSubmitting ? (
-                  <span className="flex items-center gap-2">
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent border-solid" />
-                    Submitting...
-                  </span>
-                ) : (
-                  "Submit Emergency Report"
-                )}
+              <Button type="submit" className="w-full" disabled={!coordinates}>
+                Submit Emergency Report
               </Button>
             </form>
           </CardContent>
         </Card>
 
+        {/* Liste des rapports */}
         <div className="space-y-4">
-          <h3 className="text-xl font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+          <h3 className="text-xl font-semibold flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-red-600" />
-            Your Active Reports
+            Your Active Reports 
           </h3>
 
           {reports.length === 0 ? (
             <Alert>
-              <AlertTitle>No active reports</AlertTitle>
-              <AlertDescription>
-                You haven't submitted any emergency reports yet
-              </AlertDescription>
+              <AlertTitle>No Active Reports</AlertTitle>
             </Alert>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2">
               {reports.map((report) => (
-                <Card
-                  key={report.id}
-                  className="overflow-hidden transition-all duration-200 hover:shadow-md"
-                >
-                  <div className="emergency-card">
-                    <CardContent className="p-6">
-                      <p className="text-lg font-medium text-slate-800 dark:text-slate-200 mb-2">
-                        {report.description}
-                      </p>
-                      <div className="space-y-2">
-                        <p className="text-sm text-slate-600 dark:text-slate-300">
-                          <strong>Location:</strong> {report.location}
-                        </p>
-                        {report.coordinates && (
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
-                            Coordinates: {report.coordinates.lat.toFixed(6)},{" "}
-                            {report.coordinates.lng.toFixed(6)}
-                          </p>
-                        )}
-                        <div className="flex items-center justify-between">
-                          <span
-                            className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
-                              report.status
-                            )}`}
-                          >
-                            {report.status}
-                          </span>
-                          <time className="text-xs text-slate-500 dark:text-slate-400">
-                            {new Intl.DateTimeFormat("en-US", {
-                              dateStyle: "medium",
-                              timeStyle: "short",
-                            }).format(report.submittedAt)}
-                          </time>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </div>
+                <Card key={report.id}>
+                  <CardContent className="p-4">
+                    <p>{report.description}</p>
+                    <div className="mt-2 flex justify-between items-center">
+                      <span className={`text-xs px-2 py-1 rounded-full ${getStatusVariant(report.status)}`}>
+                        {report.status}
+                      </span>
+                      <time className="text-xs text-gray-500">
+                        {new Date(report.submittedAt).toLocaleString()}
+                      </time>
+                    </div>
+                  </CardContent>
                 </Card>
               ))}
             </div>
